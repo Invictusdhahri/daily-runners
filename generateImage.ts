@@ -32,7 +32,9 @@ async function drawTrendingTokensImage() {
     ctx.drawImage(templateImg, 0, 0, WIDTH, HEIGHT);
 
     // Fetch tokens
-    const tokens = (await getTrendingPools()).slice(0, NUM_TOKENS);
+    let tokens = (await getTrendingPools())
+      .filter(token => Number(token.market_cap) > 100000 && Number(token.price_change_24h) > 0)
+      .slice(0, NUM_TOKENS);
 
     // Calculate vertical centering
     const totalListHeight = ITEM_HEIGHT * tokens.length;
@@ -77,10 +79,19 @@ async function drawTrendingTokensImage() {
       if (changeStr && !changeStr.startsWith('+') && Number(change) > 0) changeStr = '+' + changeStr;
       ctx.fillText(changeStr, CHANGE_X, y + 20);
 
-      // Price (white, right-aligned, under change)
+      // Market cap (white, right-aligned, under change)
       ctx.font = '18px Arial';
       ctx.fillStyle = TEXT_COLOR;
-      ctx.fillText(`$${Number(token.coin_price).toPrecision(4)}`, PRICE_X, y + 48);
+      let marketCapNum = Number(token.market_cap);
+      let marketCapStr = '';
+      if (marketCapNum >= 1e6) {
+        marketCapStr = `$${(marketCapNum / 1e6).toFixed(1)}M`;
+      } else if (marketCapNum >= 1e3) {
+        marketCapStr = `$${(marketCapNum / 1e3).toFixed(0)}K`;
+      } else {
+        marketCapStr = `$${marketCapNum.toFixed(0)}`;
+      }
+      ctx.fillText(marketCapStr, PRICE_X, y + 48);
     }
 
     // Save to file
