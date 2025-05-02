@@ -31,10 +31,29 @@ async function drawTrendingTokensImage() {
     const templateImg = await loadImage(templatePath);
     ctx.drawImage(templateImg, 0, 0, WIDTH, HEIGHT);
 
-    // Fetch tokens
-    let tokens = (await getTrendingPools())
-      .filter(token => Number(token.market_cap) > 100000 && Number(token.price_change_24h) > 0)
-      .slice(0, NUM_TOKENS);
+    // Fetch tokens and filter for valid images
+    let rawTokens = (await getTrendingPools())
+      .filter(token => {
+        if (Number(token.market_cap) <= 100000 || Number(token.price_change_24h) <= 0) return false;
+        if (!token.coin_name || token.coin_name.trim() === '') return false;
+        if (!token.image_url || token.image_url.trim() === '' || token.image_url.toLowerCase().includes('placeholder') || token.image_url.toLowerCase().includes('default')) return false;
+        return true;
+      })
+      .filter((token, index, self) =>
+        index === self.findIndex(t => t.coin_name?.toLowerCase() === token.coin_name?.toLowerCase())
+      );
+
+    // Only keep tokens whose images load successfully
+    let tokens: SimplifiedPoolInfo[] = [];
+    for (let i = 0; i < rawTokens.length && tokens.length < NUM_TOKENS; i++) {
+      try {
+        await loadImage(rawTokens[i].image_url);
+        tokens.push(rawTokens[i]);
+      } catch {
+        // Skip tokens whose images fail to load
+        continue;
+      }
+    }
 
     // Calculate vertical centering
     const totalListHeight = ITEM_HEIGHT * tokens.length;
@@ -49,7 +68,14 @@ async function drawTrendingTokensImage() {
       try {
         img = await loadImage(token.image_url);
       } catch {
-        img = await loadImage('https://via.placeholder.com/56x56?text=?');
+        // Create a fallback colored circle instead of loading placeholder
+        const fallbackCanvas = createCanvas(IMAGE_SIZE, IMAGE_SIZE);
+        const fallbackCtx = fallbackCanvas.getContext('2d');
+        fallbackCtx.fillStyle = '#666666'; // Gray color for placeholder
+        fallbackCtx.beginPath();
+        fallbackCtx.arc(IMAGE_SIZE/2, IMAGE_SIZE/2, IMAGE_SIZE/2, 0, Math.PI * 2);
+        fallbackCtx.fill();
+        img = fallbackCanvas;
       }
       ctx.save();
       ctx.beginPath();
