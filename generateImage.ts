@@ -31,52 +31,44 @@ async function drawTrendingTokensImage() {
     const templateImg = await loadImage(templatePath);
     ctx.drawImage(templateImg, 0, 0, WIDTH, HEIGHT);
 
-    // Fetch tokens and filter for valid images
-    let rawTokens = (await getTrendingPools())
-      .filter(token => {
-        if (Number(token.market_cap) <= 100000 || Number(token.price_change_24h) <= 0) return false;
-        if (!token.coin_name || token.coin_name.trim() === '') return false;
-        if (!token.image_url || token.image_url.trim() === '' || token.image_url.toLowerCase().includes('placeholder') || token.image_url.toLowerCase().includes('default')) return false;
-        return true;
-      })
+    // Fetch a larger pool of tokens to ensure we can fill 5 valid ones
+    const RAW_POOL_SIZE = 20;
+    const tokens = (await getTrendingPools())
+      .filter(token => 
+        Number(token.market_cap) > 100000 && 
+        Number(token.price_change_24h) > 0 &&
+        token.coin_name?.trim() &&
+        token.image_url?.trim() &&
+        !token.image_url.toLowerCase().includes('placeholder') &&
+        !token.image_url.toLowerCase().includes('default')
+      )
       .filter((token, index, self) =>
         index === self.findIndex(t => t.coin_name?.toLowerCase() === token.coin_name?.toLowerCase())
-      );
+      )
+      .slice(0, RAW_POOL_SIZE);
 
-    // Only keep tokens whose images load successfully
-    let tokens: SimplifiedPoolInfo[] = [];
-    for (let i = 0; i < rawTokens.length && tokens.length < NUM_TOKENS; i++) {
+    // Only keep tokens whose images load successfully (up to NUM_TOKENS)
+    const validTokens: typeof tokens = [];
+    for (let i = 0; i < tokens.length && validTokens.length < NUM_TOKENS; i++) {
       try {
-        await loadImage(rawTokens[i].image_url);
-        tokens.push(rawTokens[i]);
+        await loadImage(tokens[i].image_url);
+        validTokens.push(tokens[i]);
       } catch {
-        // Skip tokens whose images fail to load
         continue;
       }
     }
 
     // Calculate vertical centering
-    const totalListHeight = ITEM_HEIGHT * tokens.length;
+    const totalListHeight = ITEM_HEIGHT * validTokens.length;
     const startY = BOX_TOP + Math.floor((BOX_HEIGHT - totalListHeight) / 2);
 
-    for (let i = 0; i < tokens.length; i++) {
+    // Draw tokens (only those with valid images)
+    for (let i = 0; i < validTokens.length; i++) {
       const y = startY + i * ITEM_HEIGHT;
-      const token = tokens[i];
+      const token = validTokens[i];
 
-      // Token image
-      let img;
-      try {
-        img = await loadImage(token.image_url);
-      } catch {
-        // Create a fallback colored circle instead of loading placeholder
-        const fallbackCanvas = createCanvas(IMAGE_SIZE, IMAGE_SIZE);
-        const fallbackCtx = fallbackCanvas.getContext('2d');
-        fallbackCtx.fillStyle = '#666666'; // Gray color for placeholder
-        fallbackCtx.beginPath();
-        fallbackCtx.arc(IMAGE_SIZE/2, IMAGE_SIZE/2, IMAGE_SIZE/2, 0, Math.PI * 2);
-        fallbackCtx.fill();
-        img = fallbackCanvas;
-      }
+      // Draw token image (guaranteed to load)
+      const img = await loadImage(token.image_url);
       ctx.save();
       ctx.beginPath();
       ctx.arc(IMAGE_X + IMAGE_SIZE / 2, y + IMAGE_SIZE / 2, IMAGE_SIZE / 2, 0, Math.PI * 2);
@@ -85,50 +77,50 @@ async function drawTrendingTokensImage() {
       ctx.drawImage(img, IMAGE_X, y, IMAGE_SIZE, IMAGE_SIZE);
       ctx.restore();
 
-      // Name
-      ctx.font = 'bold 24px Arial';
+      // Draw token name
+      ctx.font = '700 26px Inter, Arial, sans-serif';
       ctx.fillStyle = TEXT_COLOR;
       ctx.textAlign = 'left';
       ctx.fillText(token.coin_name || 'Unknown', NAME_X, y + 28);
 
-      // Volume (gray, under name)
-      ctx.font = '16px Arial';
+      // Draw volume
+      ctx.font = '500 16px Inter, Arial, sans-serif';
       ctx.fillStyle = SUBTEXT_COLOR;
       ctx.fillText(`$${(Number(token.volume_24h) / 1e6).toFixed(1)}M volume`, NAME_X, y + 52);
 
-      // Price change (green, right-aligned, 24h)
-      ctx.font = 'bold 22px Arial';
-      ctx.fillStyle = GREEN;
-      ctx.textAlign = 'right';
-      let change = token.price_change_24h;
-      let changeStr = change ? `${Number(change).toFixed(2)}%` : '';
-      if (changeStr && !changeStr.startsWith('+') && Number(change) > 0) changeStr = '+' + changeStr;
-      ctx.fillText(changeStr, CHANGE_X, y + 20);
-
-      // Market cap (white, right-aligned, under change)
-      ctx.font = '18px Arial';
-      ctx.fillStyle = TEXT_COLOR;
-      let marketCapNum = Number(token.market_cap);
-      let marketCapStr = '';
-      if (marketCapNum >= 1e6) {
-        marketCapStr = `$${(marketCapNum / 1e6).toFixed(1)}M`;
-      } else if (marketCapNum >= 1e3) {
-        marketCapStr = `$${(marketCapNum / 1e3).toFixed(0)}K`;
-      } else {
-        marketCapStr = `$${marketCapNum.toFixed(0)}`;
+      // Draw price change
+      const change = Number(token.price_change_24h);
+      if (change > 0) {
+        ctx.font = '700 24px Inter, Arial, sans-serif';
+        ctx.fillStyle = GREEN;
+        ctx.textAlign = 'right';
+        const changeStr = `+${change.toFixed(2)}%`;
+        ctx.fillText(changeStr, CHANGE_X, y + 20);
       }
+
+      // Draw market cap
+      ctx.font = '500 18px Inter, Arial, sans-serif';
+      ctx.fillStyle = TEXT_COLOR;
+      const marketCap = Number(token.market_cap);
+      const marketCapStr = marketCap >= 1e6 
+        ? `$${(marketCap / 1e6).toFixed(1)}M` 
+        : marketCap >= 1e3 
+          ? `$${(marketCap / 1e3).toFixed(0)}K` 
+          : `$${marketCap.toFixed(0)}`;
       ctx.fillText(marketCapStr, PRICE_X, y + 48);
     }
 
-    // Save to file
+    // Save image
     const outputPath = path.join(__dirname, 'output.png');
-    const out = fs.createWriteStream(outputPath);
     const stream = canvas.createPNGStream();
-    await new Promise((resolve, reject) => {
-      (stream as any).on('data', (chunk: any) => out.write(chunk));
-      (stream as any).on('end', () => { out.end(); resolve(null); });
-      (stream as any).on('error', (error: any) => reject(error));
+    const out = fs.createWriteStream(outputPath);
+    
+    await new Promise<void>((resolve, reject) => {
+      stream.pipe(out);
+      out.on('finish', () => resolve());
+      out.on('error', reject);
     });
+    
     console.log('Image saved successfully as output.png');
   } catch (error) {
     console.error('Error in drawTrendingTokensImage:', error);
