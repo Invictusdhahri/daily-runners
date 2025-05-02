@@ -5,101 +5,94 @@ import { getTrendingPools, SimplifiedPoolInfo } from './trending-tokens';
 
 const WIDTH = 1080;
 const HEIGHT = 1080;
-const ITEM_HEIGHT = 140; // Increased height for better spacing
-const IMAGE_SIZE = 80; // Increased image size
+// Black box area (from template):
+const BOX_LEFT = 180;
+const BOX_TOP = 200;
+const BOX_WIDTH = 750;
+const BOX_HEIGHT = 840;
+const NUM_TOKENS = 5;
+const ITEM_HEIGHT = Math.floor(BOX_HEIGHT / (NUM_TOKENS + 1)); // leave some padding at top/bottom
+const IMAGE_SIZE = 56;
+const IMAGE_X = BOX_LEFT + 32;
+const NAME_X = IMAGE_X + IMAGE_SIZE + 24;
+const CHANGE_X = BOX_LEFT + BOX_WIDTH - 60; // right-aligned for change
+const PRICE_X = BOX_LEFT + BOX_WIDTH - 60; // right-aligned for price
 const TEXT_COLOR = '#fff';
 const SUBTEXT_COLOR = '#aaa';
 const GREEN = '#2ecc40';
 
-// Calculate center position
-const CENTER_X = WIDTH / 2;
-const CENTER_Y = HEIGHT / 2;
-const TOKENS_START_Y = CENTER_Y - (ITEM_HEIGHT * 2.5); // Start 2.5 items above center
-const LEFT_MARGIN = 200; // Distance from center to left content
-const RIGHT_MARGIN = 200; // Distance from center to right content
-
 async function drawTrendingTokensImage() {
   try {
-    console.log('Starting image generation...');
     const canvas = createCanvas(WIDTH, HEIGHT);
     const ctx = canvas.getContext('2d');
 
-    // Load and draw the template image as the background
+    // Draw template background
     const templatePath = path.join(__dirname, 'template.png');
-    console.log('Attempting to load template from:', templatePath);
-    
-    try {
-      const templateImg = await loadImage(templatePath);
-      console.log('Template loaded successfully:', templateImg.width, templateImg.height);
-      ctx.drawImage(templateImg, 0, 0, WIDTH, HEIGHT);
-    } catch (error) {
-      console.error('Error loading template image:', error);
-      throw error;
-    }
+    const templateImg = await loadImage(templatePath);
+    ctx.drawImage(templateImg, 0, 0, WIDTH, HEIGHT);
 
     // Fetch tokens
-    const tokens = (await getTrendingPools()).slice(0, 5);
+    const tokens = (await getTrendingPools()).slice(0, NUM_TOKENS);
+
+    // Calculate vertical centering
+    const totalListHeight = ITEM_HEIGHT * tokens.length;
+    const startY = BOX_TOP + Math.floor((BOX_HEIGHT - totalListHeight) / 2);
 
     for (let i = 0; i < tokens.length; i++) {
-      const y = TOKENS_START_Y + i * ITEM_HEIGHT;
+      const y = startY + i * ITEM_HEIGHT;
       const token = tokens[i];
 
       // Token image
       let img;
       try {
-        if (!token.image_url) {
-          throw new Error('No image URL provided');
-        }
         img = await loadImage(token.image_url);
-      } catch (error) {
-        console.warn(`Failed to load image for token ${token.coin_name}:`, error);
-        img = await loadImage('https://via.placeholder.com/80x80?text=?');
+      } catch {
+        img = await loadImage('https://via.placeholder.com/56x56?text=?');
       }
-
-      // Draw token image
       ctx.save();
       ctx.beginPath();
-      ctx.arc(CENTER_X - LEFT_MARGIN, y + 40, IMAGE_SIZE / 2, 0, Math.PI * 2);
+      ctx.arc(IMAGE_X + IMAGE_SIZE / 2, y + IMAGE_SIZE / 2, IMAGE_SIZE / 2, 0, Math.PI * 2);
       ctx.closePath();
       ctx.clip();
-      ctx.drawImage(img, CENTER_X - LEFT_MARGIN - IMAGE_SIZE/2, y, IMAGE_SIZE, IMAGE_SIZE);
+      ctx.drawImage(img, IMAGE_X, y, IMAGE_SIZE, IMAGE_SIZE);
       ctx.restore();
 
-      // Coin name
-      ctx.font = 'bold 28px Arial';
-      ctx.fillStyle = TEXT_COLOR;
-      ctx.fillText(token.coin_name || 'Unknown Token', CENTER_X - LEFT_MARGIN + 60, y + 40);
-
-      // Market cap
-      ctx.font = '18px Arial';
-      ctx.fillStyle = SUBTEXT_COLOR;
-      const marketCap = token.market_cap ? `$${Number(token.market_cap).toLocaleString()}` : 'N/A';
-      ctx.fillText(`Market Cap: ${marketCap}`, CENTER_X - LEFT_MARGIN + 60, y + 70);
-
-      // Price
+      // Name
       ctx.font = 'bold 24px Arial';
+      ctx.fillStyle = TEXT_COLOR;
+      ctx.textAlign = 'left';
+      ctx.fillText(token.coin_name || 'Unknown', NAME_X, y + 28);
+
+      // Volume (gray, under name)
+      ctx.font = '16px Arial';
+      ctx.fillStyle = SUBTEXT_COLOR;
+      ctx.fillText(`$${(Number(token.volume_24h) / 1e6).toFixed(1)}M volume`, NAME_X, y + 52);
+
+      // Price change (green, right-aligned, 24h)
+      ctx.font = 'bold 22px Arial';
       ctx.fillStyle = GREEN;
-      const price = token.coin_price ? `$${Number(token.coin_price).toPrecision(4)}` : 'N/A';
-      ctx.fillText(price, CENTER_X + RIGHT_MARGIN - 100, y + 50);
+      ctx.textAlign = 'right';
+      let change = token.price_change_24h;
+      let changeStr = change ? `${Number(change).toFixed(2)}%` : '';
+      if (changeStr && !changeStr.startsWith('+') && Number(change) > 0) changeStr = '+' + changeStr;
+      ctx.fillText(changeStr, CHANGE_X, y + 20);
+
+      // Price (white, right-aligned, under change)
+      ctx.font = '18px Arial';
+      ctx.fillStyle = TEXT_COLOR;
+      ctx.fillText(`$${Number(token.coin_price).toPrecision(4)}`, PRICE_X, y + 48);
     }
 
     // Save to file
     const outputPath = path.join(__dirname, 'output.png');
-    console.log('Saving output to:', outputPath);
     const out = fs.createWriteStream(outputPath);
     const stream = canvas.createPNGStream();
     await new Promise((resolve, reject) => {
       (stream as any).on('data', (chunk: any) => out.write(chunk));
-      (stream as any).on('end', () => {
-        out.end();
-        console.log('Image saved successfully as output.png');
-        resolve(null);
-      });
-      (stream as any).on('error', (error: any) => {
-        console.error('Error saving image:', error);
-        reject(error);
-      });
+      (stream as any).on('end', () => { out.end(); resolve(null); });
+      (stream as any).on('error', (error: any) => reject(error));
     });
+    console.log('Image saved successfully as output.png');
   } catch (error) {
     console.error('Error in drawTrendingTokensImage:', error);
     throw error;

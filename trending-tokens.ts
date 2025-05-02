@@ -60,6 +60,7 @@ export interface SimplifiedPoolInfo {
   token_address: string;
   image_url: string;
   holders: number;
+  price_change_24h: string;
 }
 
 interface TrendingPoolsResponse {
@@ -124,7 +125,8 @@ async function processPool(pool: TrendingPool): Promise<SimplifiedPoolInfo> {
         liquidity: '0',
         token_address: '',
         image_url: '',
-        holders: 0
+        holders: 0,
+        price_change_24h: '0'
       };
     }
 
@@ -148,7 +150,8 @@ async function processPool(pool: TrendingPool): Promise<SimplifiedPoolInfo> {
         liquidity: '0',
         token_address: '',
         image_url: '',
-        holders: 0
+        holders: 0,
+        price_change_24h: '0'
       };
     }
 
@@ -170,7 +173,8 @@ async function processPool(pool: TrendingPool): Promise<SimplifiedPoolInfo> {
       liquidity: pool.attributes.reserve_in_usd || '0',
       token_address: tokenAddress,
       image_url: tokenInfo?.imageUrl || '',
-      holders: tokenInfo?.holders || 0
+      holders: tokenInfo?.holders || 0,
+      price_change_24h: pool.attributes.price_change_percentage?.h24 || '0'
     };
   } catch (error) {
     console.error('Error processing pool:', error);
@@ -183,7 +187,8 @@ async function processPool(pool: TrendingPool): Promise<SimplifiedPoolInfo> {
       liquidity: '0',
       token_address: '',
       image_url: '',
-      holders: 0
+      holders: 0,
+      price_change_24h: '0'
     };
   }
 }
