@@ -1,17 +1,22 @@
 import { createCanvas, loadImage } from 'canvas';
 import * as fs from 'fs';
 import * as path from 'path';
-import { getTrendingPools } from './trending-tokens';
-const puppeteer = require('puppeteer');
+import { getTrendingPools, SimplifiedPoolInfo } from './trending-tokens';
 
 const WIDTH = 1080;
 const HEIGHT = 1080;
-const ITEM_HEIGHT = 120;
-const PADDING = 30;
-const IMAGE_SIZE = 60;
+const ITEM_HEIGHT = 140; // Increased height for better spacing
+const IMAGE_SIZE = 80; // Increased image size
 const TEXT_COLOR = '#fff';
 const SUBTEXT_COLOR = '#aaa';
 const GREEN = '#2ecc40';
+
+// Calculate center position
+const CENTER_X = WIDTH / 2;
+const CENTER_Y = HEIGHT / 2;
+const TOKENS_START_Y = CENTER_Y - (ITEM_HEIGHT * 2.5); // Start 2.5 items above center
+const LEFT_MARGIN = 200; // Distance from center to left content
+const RIGHT_MARGIN = 200; // Distance from center to right content
 
 async function drawTrendingTokensImage() {
   try {
@@ -32,47 +37,50 @@ async function drawTrendingTokensImage() {
       throw error;
     }
 
-    // Title
-    ctx.font = 'bold 36px Arial';
-    ctx.fillStyle = TEXT_COLOR;
-    ctx.fillText('Trending Tokens', PADDING + 20, PADDING + 50);
-
     // Fetch tokens
     const tokens = (await getTrendingPools()).slice(0, 5);
 
     for (let i = 0; i < tokens.length; i++) {
-      const y = PADDING + 80 + i * ITEM_HEIGHT;
+      const y = TOKENS_START_Y + i * ITEM_HEIGHT;
       const token = tokens[i];
 
       // Token image
       let img;
       try {
+        if (!token.image_url) {
+          throw new Error('No image URL provided');
+        }
         img = await loadImage(token.image_url);
-      } catch {
-        img = await loadImage('https://via.placeholder.com/60x60?text=?');
+      } catch (error) {
+        console.warn(`Failed to load image for token ${token.coin_name}:`, error);
+        img = await loadImage('https://via.placeholder.com/80x80?text=?');
       }
+
+      // Draw token image
       ctx.save();
       ctx.beginPath();
-      ctx.arc(PADDING + 40, y + 30, IMAGE_SIZE / 2, 0, Math.PI * 2);
+      ctx.arc(CENTER_X - LEFT_MARGIN, y + 40, IMAGE_SIZE / 2, 0, Math.PI * 2);
       ctx.closePath();
       ctx.clip();
-      ctx.drawImage(img, PADDING + 10, y, IMAGE_SIZE, IMAGE_SIZE);
+      ctx.drawImage(img, CENTER_X - LEFT_MARGIN - IMAGE_SIZE/2, y, IMAGE_SIZE, IMAGE_SIZE);
       ctx.restore();
 
       // Coin name
-      ctx.font = 'bold 24px Arial';
+      ctx.font = 'bold 28px Arial';
       ctx.fillStyle = TEXT_COLOR;
-      ctx.fillText(token.coin_name, PADDING + 90, y + 30);
+      ctx.fillText(token.coin_name || 'Unknown Token', CENTER_X - LEFT_MARGIN + 60, y + 40);
 
       // Market cap
-      ctx.font = '16px Arial';
+      ctx.font = '18px Arial';
       ctx.fillStyle = SUBTEXT_COLOR;
-      ctx.fillText(`Market Cap: $${Number(token.market_cap).toLocaleString()}`, PADDING + 90, y + 55);
+      const marketCap = token.market_cap ? `$${Number(token.market_cap).toLocaleString()}` : 'N/A';
+      ctx.fillText(`Market Cap: ${marketCap}`, CENTER_X - LEFT_MARGIN + 60, y + 70);
 
       // Price
-      ctx.font = 'bold 20px Arial';
+      ctx.font = 'bold 24px Arial';
       ctx.fillStyle = GREEN;
-      ctx.fillText(`$${Number(token.coin_price).toPrecision(4)}`, WIDTH - PADDING - 150, y + 40);
+      const price = token.coin_price ? `$${Number(token.coin_price).toPrecision(4)}` : 'N/A';
+      ctx.fillText(price, CENTER_X + RIGHT_MARGIN - 100, y + 50);
     }
 
     // Save to file
@@ -98,49 +106,7 @@ async function drawTrendingTokensImage() {
   }
 }
 
-async function generatePuppeteerImage() {
-  try {
-    console.log('Starting Puppeteer image generation...');
-    const browser = await puppeteer.launch();
-    const page = await browser.newPage();
-
-    // Load your HTML file
-    await page.goto('file://' + __dirname + '/template.html');
-
-    // Inject tokens data (replace with your actual data)
-    const tokens = (await getTrendingPools()).slice(0, 5);
-    await page.evaluate((tokens) => {
-      const container = document.getElementById('tokens');
-      tokens.forEach(token => {
-        const div = document.createElement('div');
-        div.innerHTML = `<img src="${token.image_url}" style="width:60px;height:60px;border-radius:50%;vertical-align:middle;">
-          <span style="font-weight:bold;font-size:24px;margin-left:20px;">${token.coin_name}</span>
-          <span style="color:#aaa;font-size:16px;margin-left:10px;">Market Cap: $${Number(token.market_cap).toLocaleString()}</span>
-          <span style="color:#2ecc40;font-size:20px;float:right;">$${Number(token.coin_price).toPrecision(4)}</span>`;
-        container.appendChild(div);
-      });
-    }, tokens);
-
-    // Wait for images to load
-    await page.waitForTimeout(1000);
-
-    // Screenshot the page
-    await page.screenshot({ path: 'output.png', clip: { x: 0, y: 0, width: 1080, height: 1080 } });
-
-    await browser.close();
-    console.log('Puppeteer image generation completed successfully');
-  } catch (error) {
-    console.error('Error in generatePuppeteerImage:', error);
-    throw error;
-  }
-}
-
 drawTrendingTokensImage().catch(error => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-});
-
-generatePuppeteerImage().catch(error => {
   console.error('Fatal error:', error);
   process.exit(1);
 });

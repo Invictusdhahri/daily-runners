@@ -1,4 +1,4 @@
-import fetch from 'cross-fetch';
+import fetch from 'node-fetch';
 
 interface TrendingPool {
   id: string;
@@ -50,7 +50,7 @@ interface TokenInfo {
   };
 }
 
-interface SimplifiedPoolInfo {
+export interface SimplifiedPoolInfo {
   coin_name: string;
   coin_price: string;
   market_cap: string;
@@ -82,22 +82,26 @@ export async function getTrendingPools(): Promise<SimplifiedPoolInfo[]> {
     );
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch trending pools: ${response.status}`);
+      throw new Error(`Failed to fetch trending pools: ${response.status} ${response.statusText}`);
     }
 
     const data: TrendingPoolsResponse = await response.json();
     
+    if (!data.data || !Array.isArray(data.data)) {
+      throw new Error('Invalid response format: missing or invalid data array');
+    }
+
     // Process pools in parallel with a limit of 5 concurrent requests
     const batchSize = 5;
     const results: SimplifiedPoolInfo[] = [];
     const filteredPools = data.data.filter(pool => 
-      parseFloat(pool.attributes.reserve_in_usd || '0') >= 1000
+      pool.attributes && parseFloat(pool.attributes.reserve_in_usd || '0') >= 1000
     );
 
     for (let i = 0; i < filteredPools.length; i += batchSize) {
       const batch = filteredPools.slice(i, i + batchSize);
       const batchResults = await Promise.all(batch.map(processPool));
-      results.push(...batchResults);
+      results.push(...batchResults.filter(Boolean)); // Filter out any null/undefined results
     }
 
     return results;
@@ -108,33 +112,80 @@ export async function getTrendingPools(): Promise<SimplifiedPoolInfo[]> {
 }
 
 async function processPool(pool: TrendingPool): Promise<SimplifiedPoolInfo> {
-  const poolName = pool.attributes.name || '';
-  const [baseToken] = poolName.split('/');
-  const coinName = pool.attributes.base_token_name || baseToken || 'Unknown';
-  const marketCap = pool.attributes.market_cap_usd || pool.attributes.fdv_usd || '0';
-  const dexId = pool.relationships?.dex?.data?.id || '';
-  const dexName = getDexName(dexId);
-  const tokenAddress = pool.attributes.base_token_address || 
-    pool.relationships?.base_token?.data?.id?.replace('solana_', '') || '';
+  try {
+    if (!pool.attributes) {
+      console.warn('Pool missing attributes:', pool);
+      return {
+        coin_name: 'Unknown',
+        coin_price: '0',
+        market_cap: '0',
+        volume_24h: '0',
+        dex_name: 'Unknown',
+        liquidity: '0',
+        token_address: '',
+        image_url: '',
+        holders: 0
+      };
+    }
 
-  let tokenInfo = tokenInfoCache.get(tokenAddress);
+    const poolName = pool.attributes.name || '';
+    const [baseToken] = poolName.split('/');
+    const coinName = pool.attributes.base_token_name || baseToken || 'Unknown';
+    const marketCap = pool.attributes.market_cap_usd || pool.attributes.fdv_usd || '0';
+    const dexId = pool.relationships?.dex?.data?.id || '';
+    const dexName = getDexName(dexId);
+    const tokenAddress = pool.attributes.base_token_address || 
+      pool.relationships?.base_token?.data?.id?.replace('solana_', '') || '';
 
-  if (!tokenInfo) {
-    tokenInfo = await fetchTokenInfo(tokenAddress);
-    tokenInfoCache.set(tokenAddress, tokenInfo);
+    if (!tokenAddress) {
+      console.warn('Pool missing token address:', pool);
+      return {
+        coin_name: coinName,
+        coin_price: '0',
+        market_cap: marketCap,
+        volume_24h: '0',
+        dex_name: dexName,
+        liquidity: '0',
+        token_address: '',
+        image_url: '',
+        holders: 0
+      };
+    }
+
+    let tokenInfo = tokenInfoCache.get(tokenAddress);
+
+    if (!tokenInfo) {
+      tokenInfo = await fetchTokenInfo(tokenAddress);
+      if (tokenInfo) {
+        tokenInfoCache.set(tokenAddress, tokenInfo);
+      }
+    }
+
+    return {
+      coin_name: coinName,
+      coin_price: pool.attributes.base_token_price_usd || '0',
+      market_cap: marketCap,
+      volume_24h: pool.attributes.volume_usd?.h24 || '0',
+      dex_name: dexName,
+      liquidity: pool.attributes.reserve_in_usd || '0',
+      token_address: tokenAddress,
+      image_url: tokenInfo?.imageUrl || '',
+      holders: tokenInfo?.holders || 0
+    };
+  } catch (error) {
+    console.error('Error processing pool:', error);
+    return {
+      coin_name: 'Unknown',
+      coin_price: '0',
+      market_cap: '0',
+      volume_24h: '0',
+      dex_name: 'Unknown',
+      liquidity: '0',
+      token_address: '',
+      image_url: '',
+      holders: 0
+    };
   }
-
-  return {
-    coin_name: coinName,
-    coin_price: pool.attributes.base_token_price_usd || '0',
-    market_cap: marketCap,
-    volume_24h: pool.attributes.volume_usd?.h24 || '0',
-    dex_name: dexName,
-    liquidity: pool.attributes.reserve_in_usd || '0',
-    token_address: tokenAddress,
-    image_url: tokenInfo.imageUrl,
-    holders: tokenInfo.holders
-  };
 }
 
 async function fetchTokenInfo(tokenAddress: string): Promise<{ imageUrl: string; holders: number }> {

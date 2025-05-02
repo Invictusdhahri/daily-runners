@@ -1,12 +1,15 @@
 {
   "dependencies": {
     "canvas": "^3.1.0",
-    "cross-fetch": "^4.0.0"
+    "cross-fetch": "^4.1.0",
+    "puppeteer": "^24.8.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",
-    "typescript": "^5.3.3",
-    "ts-node": "^10.9.2"
+    "@types/node-fetch": "^2.6.12",
+    "@types/puppeteer": "^5.4.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
   },
   "scripts": {
     "start": "ts-node generateImage.ts"
