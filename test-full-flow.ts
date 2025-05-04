@@ -12,7 +12,7 @@ const INTERCOM_TOKEN = process.env.INTERCOM_TOKEN;
 const ADMIN_ID = process.env.INTERCOM_ADMIN_ID;
 const IMAGE_PATH = path.join(__dirname, 'output.png');
 const TEST_USER_ID = '671ecd6fe457bce823c4c979'; // Your test user ID
-const SAMPLE_IMAGE_URL = 'https://via.placeholder.com/500x300?text=Daily+Token+Update';
+const SAMPLE_IMAGE_URL = 'https://cdn.pixabay.com/photo/2021/05/24/09/15/ethereum-6278326_960_720.png';
 
 async function testFullFlow() {
   console.log('🔍 Testing daily runner flow with a single user...');
@@ -23,8 +23,8 @@ async function testFullFlow() {
     console.log('\n📊 STEP 1: Generating daily image...');
     await generateImage();
     
-    // Step 2: We'll simulate S3 upload with a placeholder image
-    console.log('\n🖼️ STEP 2: Simulating image hosting (using placeholder)...');
+    // Step 2: We'll simulate S3 upload with a reliable image
+    console.log('\n🖼️ STEP 2: Simulating image hosting (using trusted CDN)...');
     const imageUrl = SAMPLE_IMAGE_URL;
     console.log(`Using image URL: ${imageUrl}`);
     
@@ -81,10 +81,12 @@ async function sendMessageToTestUser(imageUrl: string): Promise<void> {
   });
   
   const messageContent = `
-    <h2>Your Daily Trending Tokens Update - TEST</h2>
-    <p>Here are the trending tokens for ${currentDate}:</p>
-    <img src="${imageUrl}" alt="Trending Tokens Today" style="width: 100%; max-width: 500px;" />
-    <p>This is a test of the complete daily runner flow.</p>
+    <h2 style="color:#333; font-size:18px; margin-bottom:10px;">Your Daily Trending Tokens Update - TEST</h2>
+    <p style="margin-bottom:15px;">Here are the trending tokens for ${currentDate}:</p>
+    <div style="text-align:center; margin:15px 0;">
+      <img src="${imageUrl}" alt="Ethereum Token" style="max-width:100%; width:300px; border-radius:8px; border:1px solid #eee;" />
+    </div>
+    <p style="margin-top:15px;">This is a test of the complete daily runner flow. The image above should be visible.</p>
   `;
   
   // Initialize Intercom API client
