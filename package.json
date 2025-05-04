@@ -1,7 +1,12 @@
 {
+  "name": "daily-runners",
+  "version": "1.0.0",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.515.0",
     "canvas": "^3.1.0",
     "cross-fetch": "^4.1.0",
+    "dotenv": "^16.4.5",
+    "node-fetch": "^2.6.12",
     "puppeteer": "^24.8.0",
     "sharp": "^0.34.1"
   },
@@ -13,6 +18,8 @@
     "typescript": "^5.3.3"
   },
   "scripts": {
-    "start": "ts-node generateImage.ts"
+    "generate-image": "ts-node generateImage.ts",
+    "send-daily-message": "ts-node sendDailyMessage.ts",
+    "daily-complete": "ts-node dailyRunner.ts"
   }
 }
