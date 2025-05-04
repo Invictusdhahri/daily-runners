@@ -11,6 +11,72 @@ This project automatically generates images of trending tokens and sends them to
 
 ## Deployment Options
 
+### Fly.io Deployment
+
+This project can be easily deployed on Fly.io. Follow these steps:
+
+1. **Install Fly CLI**
+
+```bash
+# For macOS
+brew install flyctl
+
+# For Linux
+curl -L https://fly.io/install.sh | sh
+
+# For Windows (using PowerShell)
+iwr https://fly.io/install.ps1 -useb | iex
+```
+
+2. **Login to Fly.io**
+
+```bash
+fly auth login
+```
+
+3. **Deploy to Fly.io**
+
+```bash
+# Navigate to the project directory
+cd daily-runners
+
+# Launch the app on Fly.io
+fly launch
+
+# During launch setup:
+# - Choose a unique app name or use the suggested one
+# - Select your preferred organization and region
+# - Say YES to creating a volume for data persistence
+```
+
+4. **Set Environment Variables**
+
+```bash
+fly secrets set INTERCOM_TOKEN=your_intercom_token_here \
+                INTERCOM_ADMIN_ID=your_intercom_admin_id \
+                IMGBB_API_KEY=your_imgbb_api_key_here \
+                DATA_DIR=/app/data
+```
+
+5. **Deploy the App**
+
+```bash
+fly deploy
+```
+
+6. **Monitor the App**
+
+```bash
+# View logs
+fly logs
+
+# SSH into the VM if needed
+fly ssh console
+
+# Access the app in browser
+fly open
+```
+
 ### VPS Deployment (Recommended)
 
 For detailed instructions on deploying this service on a VPS, see [README-VPS.md](README-VPS.md).
