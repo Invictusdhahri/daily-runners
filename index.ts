@@ -50,6 +50,7 @@ app.get('/', (req: Request, res: Response) => {
     <p>Last run: ${lastRunTime ? new Date(lastRunTime).toLocaleString() : 'Never'}</p>
     <p>Next run: ${getNextRunTime()}</p>
     <p>Server time: ${new Date().toLocaleString()}</p>
+    <p>Environment: ${process.env.RAILWAY_STATIC_URL ? 'Railway' : 'Local'}</p>
   `);
 });
 
@@ -66,6 +67,7 @@ app.get('/run', (req: Request, res: Response) => {
 // Start the server
 app.listen(PORT, () => {
   log(`Server is running on port ${PORT}`);
+  log(`Running on Railway: ${process.env.RAILWAY_STATIC_URL ? 'Yes' : 'No'}`);
 });
 
 // Keep track of last run time

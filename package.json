@@ -28,9 +28,12 @@
     "send-daily-message": "ts-node sendDailyMessage.ts",
     "daily": "ts-node dailyRunner.ts",
     "test-imgbb": "ts-node test-imgbb-uploader.ts",
-    "start": "ts-node generateImage.ts",
+    "start": "ts-node index.ts",
     "build": "tsc",
     "test-mode": "ts-node index.ts --test",
     "postinstall": "npm rebuild canvas --update-binary"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
