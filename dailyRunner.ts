@@ -2,7 +2,7 @@ import * as dotenv from 'dotenv';
 import * as path from 'path';
 import * as fs from 'fs';
 import { IntercomApi } from './intercom-api';
-import { uploadImageToS3 } from './imageUploader';
+import { uploadImageToImgBB } from './imgbb-uploader';
 import { execSync } from 'child_process';
 
 // Load environment variables from .env file
@@ -26,13 +26,13 @@ async function runDailyProcess() {
     console.log('Image generation completed.');
     
     // Step 2: Upload the image to get a public URL
-    console.log('Step 2: Uploading image to S3...');
+    console.log('Step 2: Uploading image to ImgBB...');
     let imageUrl;
     try {
-      imageUrl = await uploadImageToS3();
+      imageUrl = await uploadImageToImgBB(IMAGE_PATH);
       console.log(`Image uploaded successfully. URL: ${imageUrl}`);
     } catch (error) {
-      console.error('Error uploading to S3:', error);
+      console.error('Error uploading to ImgBB:', error);
       console.log(`Using fallback image URL: ${FALLBACK_IMAGE_URL}`);
       imageUrl = FALLBACK_IMAGE_URL;
     }
@@ -140,55 +140,60 @@ function getMessageContent(imageUrl: string): string {
   `;
 }
 
+// This helper function processes a batch of users with limited concurrency
 async function processBatch(
-  users: { id: string }[], 
-  intercom: IntercomApi, 
-  message: string, 
-  concurrency: number
-): Promise<{ successes: number, errors: number }> {
-  let successCount = 0;
-  let errorCount = 0;
-  let activeTasks = 0;
-  let userIndex = 0;
+  users: { id: string }[],
+  intercom: IntercomApi,
+  messageContent: string,
+  maxConcurrent: number
+): Promise<{ successes: number; errors: number }> {
+  // Keep track of results
+  let successes = 0;
+  let errors = 0;
   
-  return new Promise((resolve) => {
-    // Function to process the next user
-    async function processNextUser() {
-      if (userIndex >= users.length || activeTasks >= concurrency) {
-        // If all tasks are done, resolve the promise
-        if (userIndex >= users.length && activeTasks === 0) {
-          resolve({ successes: successCount, errors: errorCount });
-        }
-        return;
-      }
-      
-      // Get the next user
-      const user = users[userIndex++];
-      activeTasks++;
-      
-      try {
-        await intercom.sendInAppMessage(user.id, message);
-        successCount++;
-      } catch (error) {
-        // Log errors, but continue processing
-        errorCount++;
-        console.error(`Error sending message to user ${user.id}:`, error);
-      } finally {
-        activeTasks--;
-        // Process next user
-        processNextUser();
-      }
-    }
+  // Process in batches of maxConcurrent
+  for (let i = 0; i < users.length; i += maxConcurrent) {
+    const batch = users.slice(i, i + maxConcurrent);
+    const promises = batch.map(user => sendMessageToUser(user.id, intercom, messageContent));
     
-    // Start processing users up to concurrency limit
-    for (let i = 0; i < concurrency && userIndex < users.length; i++) {
-      processNextUser();
+    const results = await Promise.allSettled(promises);
+    
+    results.forEach(result => {
+      if (result.status === 'fulfilled') {
+        successes++;
+      } else {
+        errors++;
+        console.error(`Error sending message to user: ${result.reason}`);
+      }
+    });
+    
+    // Small delay between batches to avoid rate limiting
+    if (i + maxConcurrent < users.length) {
+      await new Promise(resolve => setTimeout(resolve, 200));
     }
-  });
+  }
+  
+  return { successes, errors };
 }
 
-// Run the main function
-runDailyProcess().catch(error => {
-  console.error('Fatal error in daily runner:', error);
-  process.exit(1);
-}); 
+// Helper function to send a message to a single user
+async function sendMessageToUser(
+  userId: string,
+  intercom: IntercomApi,
+  messageContent: string
+): Promise<void> {
+  try {
+    await intercom.sendInAppMessage(userId, messageContent);
+    return Promise.resolve();
+  } catch (error) {
+    return Promise.reject(error);
+  }
+}
+
+// If this script is run directly (not imported as a module)
+if (require.main === module) {
+  runDailyProcess().catch(error => {
+    console.error('Fatal error:', error);
+    process.exit(1);
+  });
+} 

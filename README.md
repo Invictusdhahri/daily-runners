@@ -1,135 +1,97 @@
-# Daily Runners - Trending Tokens
+# Daily Runners - Token Update Messages
 
-A TypeScript-based tool to fetch and monitor trending token pools on the Solana blockchain using the GeckoTerminal API. It also includes functionality to automatically send daily Intercom messages with trending tokens to all your users.
+A system that generates and sends daily token update messages to users via Intercom, with embedded images.
 
 ## Features
 
-- Fetches trending token pools from Solana network
-- Filters pools by minimum liquidity ($1000)
-- Provides detailed information for each pool:
-  - Coin name
-  - Current price
-  - Market cap
-  - 24h trading volume
-  - DEX name (supports multiple Solana DEXes)
-  - Liquidity
-  - Token address
-  - Token image
-  - Number of holders
-  - 24h price change percentage
-- Generates a daily image with trending tokens
-- Automatically uploads the image to AWS S3
-- Sends personalized daily Intercom messages to all users with the trending tokens image
+- Generates a daily token update image
+- Uploads the image to ImgBB for hosting
+- Sends messages to all users via Intercom with the embedded image
+- Handles batching and rate limiting for large user bases
+- Provides fallback mechanisms for error handling
 
-## Installation
+## Setup
 
-1. Clone this repository:
-```bash
-git clone https://github.com/your-username/daily-runners.git
-cd daily-runners
-```
-
+1. Clone this repository
 2. Install dependencies:
-```bash
-npm install
-```
+   ```
+   npm install
+   ```
+3. Create a `.env` file with the following variables:
 
-3. Create a `.env` file based on the provided example:
-```bash
-cp env.example .env
 ```
+# Intercom API credentials
+INTERCOM_TOKEN=your_intercom_api_token_here
+INTERCOM_ADMIN_ID=your_intercom_admin_id_here
 
-4. Configure your environment variables in the `.env` file:
-- Add your Intercom API token and Admin ID
-- Add AWS credentials for S3 image upload
+# ImgBB API credentials
+IMGBB_API_KEY=your_imgbb_api_key_here
+```
 
 ## Usage
 
-### Generate Daily Image Only
+### Test the image upload system
 
-```bash
-npm run generate-image
+```
+npm run test-imgbb
 ```
 
-### Run the Complete Daily Process
+This will:
+1. Generate a test image (or use an existing one)
+2. Upload it to ImgBB
+3. Send a message to the test user with the image
 
-This will generate the image, upload it to S3, and send messages to all users in Intercom:
+### Run the full daily process
 
-```bash
-npm run daily-complete
+```
+npm run daily
 ```
 
-### Individual Steps
+This will:
+1. Generate the daily image
+2. Upload it to ImgBB
+3. Send messages to all users in batches
 
-You can also run each step separately:
+### Run individual steps
 
-```bash
-# Generate the image
+You can also run each part of the process separately:
+
+```
+# Just generate the image
 npm run generate-image
 
-# Send daily messages (requires IMAGE_URL or S3 configuration)
+# Just send messages (requires existing image)
 npm run send-daily-message
 ```
 
-## Setting Up Scheduled Runs
+## Environment Variables
 
-To automate the daily process, you can set up a cron job or use a scheduler service.
+- `INTERCOM_TOKEN`: Your Intercom API token
+- `INTERCOM_ADMIN_ID`: Your Intercom admin ID
+- `IMGBB_API_KEY`: Your ImgBB API key
 
-### Example Cron Job
+## Getting an ImgBB API Key
 
-Add the following to your crontab to run the process daily at 8:00 AM:
+1. Register for an account at [ImgBB](https://imgbb.com/)
+2. Go to your account dashboard
+3. Navigate to API settings to get your API key
 
-```
-0 8 * * * cd /path/to/daily-runners && npm run daily-complete
-```
+## Troubleshooting
 
-## Intercom Setup
+If images aren't appearing in Intercom messages:
 
-Before using the Intercom messaging feature, you need to:
+1. Check that your ImgBB API key is valid
+2. Ensure the ImgBB account has hosting permissions
+3. Try the `test-imgbb-uploader.ts` script to test the upload functionality
+4. If all else fails, the system will fall back to a reliable public image URL
 
-1. Create a Private App in Intercom Developer Hub
-2. Get your Access Token and Admin ID
-3. Ensure your token has proper permissions to send messages
+## Directory Structure
 
-## Example Response
-
-The trending tokens function returns an array of token objects with the following structure:
-```json
-{
-  "coin_name": "Example Token",
-  "coin_price": "0.00643694808709027",
-  "market_cap": "6491700.17328602",
-  "volume_24h": "2383274.81130946",
-  "dex_name": "Raydium",
-  "liquidity": "920081.0507",
-  "token_address": "CniPCE4b3s8gSUPhUiyMjXnytrEqUrMfSsnbBjLCpump",
-  "image_url": "https://coin-images.coingecko.com/coins/images/54690/large/example.png",
-  "holders": 22272,
-  "price_change_24h": "5.25"
-}
-```
-
-## Supported DEXes
-
-The tool supports multiple Solana DEXes including:
-- Raydium
-- Orca
-- Jupiter
-
-## Implementation Details
-
-- Uses GeckoTerminal API for token data fetching
-- Uses Intercom API for sending daily messages to users
-- Implements caching for token information to reduce API calls
-- Processes pools in parallel with a limit of 5 concurrent requests
-- Filters out pools with liquidity less than $1000
-- Uses AWS S3 for image hosting
-
-## Requirements
-
-- Node.js 14.x or higher
-- npm or yarn
-- Internet connection for API access
-- Intercom account with API access
-- AWS account with S3 access (for image hosting)
+- `dailyRunner.ts` - Main script for the daily process
+- `generateImage.ts` - Generates the daily token image
+- `trending-tokens.ts` - Gets token data for the image
+- `imgbb-uploader.ts` - Image upload functionality
+- `intercom-api.ts` - Intercom API client
+- `sendDailyMessage.ts` - Script to send messages with existing images
+- `test-imgbb-uploader.ts` - Test script for the ImgBB uploader
  
