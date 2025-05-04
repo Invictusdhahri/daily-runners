@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { IntercomApi } from './intercom-api';
 import { uploadImageToImgBB } from './imgbb-uploader';
 import { execSync } from 'child_process';
+import { drawTrendingTokensImage } from './generateImage';
 import { SimplifiedPoolInfo } from './trending-tokens';
 
 // Load environment variables from .env file
@@ -15,70 +16,6 @@ const ADMIN_ID = process.env.INTERCOM_ADMIN_ID;
 const TEST_USER_ID = '671ecd6fe457bce823c4c979'; // The test user ID
 const IMAGE_PATH = path.join(__dirname, 'output.png');
 
-// Predefined list of top tokens with their addresses
-const TOP_TOKENS: SimplifiedPoolInfo[] = [
-  {
-    coin_name: "Solana",
-    token_address: "So11111111111111111111111111111111111111112",
-    coin_price: "0",
-    market_cap: "0",
-    volume_24h: "0",
-    dex_name: "",
-    liquidity: "0",
-    image_url: "",
-    holders: 0,
-    price_change_24h: "0"
-  },
-  {
-    coin_name: "Bonk",
-    token_address: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
-    coin_price: "0",
-    market_cap: "0",
-    volume_24h: "0",
-    dex_name: "",
-    liquidity: "0",
-    image_url: "",
-    holders: 0,
-    price_change_24h: "0"
-  },
-  {
-    coin_name: "Jupiter",
-    token_address: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
-    coin_price: "0",
-    market_cap: "0",
-    volume_24h: "0",
-    dex_name: "",
-    liquidity: "0",
-    image_url: "",
-    holders: 0,
-    price_change_24h: "0"
-  },
-  {
-    coin_name: "Raydium",
-    token_address: "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
-    coin_price: "0",
-    market_cap: "0",
-    volume_24h: "0",
-    dex_name: "",
-    liquidity: "0",
-    image_url: "",
-    holders: 0,
-    price_change_24h: "0"
-  },
-  {
-    coin_name: "Jito",
-    token_address: "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",
-    coin_price: "0",
-    market_cap: "0",
-    volume_24h: "0",
-    dex_name: "",
-    liquidity: "0",
-    image_url: "",
-    holders: 0,
-    price_change_24h: "0"
-  }
-];
-
 /**
  * Test the ImgBB uploader and send a message to the test user
  */
@@ -89,11 +26,14 @@ async function testImgBBUploaderAndMessage() {
   try {
     // Step 1: Generate or check for the image
     console.log('Step 1: Checking for image...');
+    let trendingTokens: SimplifiedPoolInfo[] = [];
+    
     if (!fs.existsSync(IMAGE_PATH)) {
       console.log('Image not found, generating now...');
-      await generateImage();
+      trendingTokens = await generateImage();
     } else {
-      console.log('Image already exists, using the existing one.');
+      console.log('Image already exists, using the existing one. Regenerating to get token data...');
+      trendingTokens = await generateImage();
     }
     
     // Step 2: Upload the image to ImgBB using our new uploader
@@ -117,7 +57,7 @@ async function testImgBBUploaderAndMessage() {
     const intercom = new IntercomApi(INTERCOM_TOKEN, ADMIN_ID);
     
     // Prepare the message content
-    const messageContent = getMessageContent(imageUrl, TOP_TOKENS);
+    const messageContent = getMessageContent(imageUrl, trendingTokens);
     
     // Send message to test user
     console.log('Sending message to test user...');
@@ -135,28 +75,28 @@ async function testImgBBUploaderAndMessage() {
 /**
  * Generate an image for testing
  */
-async function generateImage(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    try {
-      // Run the image generation script
-      execSync('npm run generate-image', { stdio: 'inherit' });
-      
-      // Verify the image was created
-      if (!fs.existsSync(IMAGE_PATH)) {
-        return reject(new Error('Image generation failed: output file not found'));
-      }
-      
-      resolve();
-    } catch (error) {
-      reject(error);
+async function generateImage(): Promise<SimplifiedPoolInfo[]> {
+  try {
+    console.log('Running direct image generation...');
+    // Directly call the function instead of using execSync
+    const trendingTokens = await drawTrendingTokensImage();
+    
+    // Verify the image was created
+    if (!fs.existsSync(IMAGE_PATH)) {
+      throw new Error('Image generation failed: output file not found');
     }
-  });
+    
+    return trendingTokens;
+  } catch (error) {
+    console.error('Error generating image:', error);
+    throw error;
+  }
 }
 
 /**
  * Create a message with the image URL for Intercom
  */
-function getMessageContent(imageUrl: string, tokenData: SimplifiedPoolInfo[]): string {
+function getMessageContent(imageUrl: string, trendingTokens: SimplifiedPoolInfo[] = []): string {
   const currentDate = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -164,30 +104,49 @@ function getMessageContent(imageUrl: string, tokenData: SimplifiedPoolInfo[]): s
     day: 'numeric'
   });
   
-  // Create the token list HTML
+  // Generate the token list HTML
   let tokenListHtml = '';
-  if (tokenData.length > 0) {
-    tokenListHtml = '<table style="width:100%; margin-top:15px; border-collapse:collapse;">';
-    tokenListHtml += '<tr style="border-bottom:1px solid #eee; color:#333; font-weight:bold;"><th style="text-align:left; padding:8px;">Token</th><th style="text-align:left; padding:8px;">Address</th></tr>';
-    
-    for (const token of tokenData) {
-      tokenListHtml += `<tr style="border-bottom:1px solid #eee;">
-        <td style="padding:8px; font-weight:500;">${token.coin_name}</td>
-        <td style="padding:8px; font-family:monospace; color:#555;">${token.token_address}</td>
-      </tr>`;
-    }
-    
-    tokenListHtml += '</table>';
+  if (trendingTokens && trendingTokens.length > 0) {
+    tokenListHtml = '<ul style="list-style-type: none; padding-left: 0; margin-top: 15px; border: 1px solid #eee; border-radius: 8px; overflow: hidden;">';
+    trendingTokens.slice(0, 5).forEach((token, index) => {
+      const price = parseFloat(token.coin_price);
+      const formattedPrice = price < 0.01 
+        ? price.toExponential(2) 
+        : price.toFixed(price < 1 ? 4 : 2);
+      
+      const change = parseFloat(token.price_change_24h);
+      const changeColor = change > 0 ? '#2ecc40' : '#ff4136';
+      const changeSign = change > 0 ? '+' : '';
+      
+      tokenListHtml += `
+        <li style="padding: 12px; ${index !== 0 ? 'border-top: 1px solid #eee;' : ''} display: flex; justify-content: space-between; background-color: ${index % 2 === 0 ? '#f8f9fa' : '#fff'};">
+          <div>
+            <strong style="font-size: 15px;">${index + 1}. ${token.coin_name}</strong>
+            <div style="font-size: 13px; color: #666; margin-top: 4px; word-break: break-all;">
+              <span>Address: ${token.token_address}</span>
+            </div>
+          </div>
+          <div style="text-align: right; min-width: 80px;">
+            <div style="font-weight: bold;">$${formattedPrice}</div>
+            <div style="color: ${changeColor}; font-size: 13px;">${changeSign}${change.toFixed(2)}%</div>
+          </div>
+        </li>
+      `;
+    });
+    tokenListHtml += '</ul>';
   }
   
   return `
     <h2 style="color:#333; font-size:18px; margin-bottom:10px;">Your Daily Trending Tokens Update</h2>
-    <p style="margin-bottom:15px;">Here are the top 5 trending tokens for ${currentDate}:</p>
+    <p style="margin-bottom:15px;">Here are the trending tokens for ${currentDate}:</p>
     <div style="text-align:center; margin:15px 0;">
       <img src="${imageUrl}" alt="Trending Tokens Today" style="max-width:100%; width:300px; border-radius:8px; border:1px solid #eee;" />
     </div>
-    ${tokenListHtml}
-    <p style="margin-top:15px;">Track these tokens and more on our platform daily!</p>
+    <div style="margin-top:20px;">
+      <h3 style="font-size:16px; color:#333; margin-bottom:10px;">Top 5 Trending Tokens:</h3>
+      ${tokenListHtml}
+    </div>
+    <p style="margin-top:20px; font-size:14px; color:#666;">Track these tokens and more on our platform daily!</p>
   `;
 }
 
