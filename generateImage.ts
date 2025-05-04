@@ -122,13 +122,26 @@ async function drawTrendingTokensImage() {
     });
     
     console.log('Image saved successfully as output.png');
+    
+    // Output the token data to be captured by dailyRunner.ts
+    console.log('TOKENS_DATA_START');
+    console.log(JSON.stringify(validTokens));
+    console.log('TOKENS_DATA_END');
+    
+    return validTokens;
   } catch (error) {
     console.error('Error in drawTrendingTokensImage:', error);
     throw error;
   }
 }
 
-drawTrendingTokensImage().catch(error => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-});
+// Export the function to make it usable from other files
+export { drawTrendingTokensImage };
+
+// Only execute if this file is run directly
+if (require.main === module) {
+  drawTrendingTokensImage().catch(error => {
+    console.error('Fatal error:', error);
+    process.exit(1);
+  });
+}
