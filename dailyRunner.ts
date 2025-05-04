@@ -18,7 +18,7 @@ const USER_CHUNK_SIZE = 25;
 const MAX_CONCURRENT_SENDS = 5;
 const FALLBACK_IMAGE_URL = 'https://cdn.pixabay.com/photo/2021/05/24/09/15/ethereum-6278326_960_720.png';
 
-async function runDailyProcess() {
+export async function runDailyProcess() {
   console.log('Daily process started at', new Date().toISOString());
   
   try {
@@ -51,7 +51,7 @@ async function runDailyProcess() {
   }
 }
 
-async function generateImage(): Promise<SimplifiedPoolInfo[]> {
+export async function generateImage(): Promise<SimplifiedPoolInfo[]> {
   try {
     console.log('Running image generation...');
     // Directly call the function instead of using execSync
@@ -124,7 +124,7 @@ async function sendMessagesToUsers(imageUrl: string, trendingTokens: SimplifiedP
   console.log(`Total results: ${successCount} successes, ${errorCount} errors out of ${users.length} users.`);
 }
 
-function getMessageContent(imageUrl: string, trendingTokens: SimplifiedPoolInfo[] = []): string {
+export function getMessageContent(imageUrl: string, trendingTokens: SimplifiedPoolInfo[] = []): string {
   const currentDate = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
