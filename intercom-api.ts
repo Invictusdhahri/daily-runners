@@ -65,11 +65,12 @@ export class IntercomApi {
    */
   async listAllUsers(): Promise<IntercomUser[]> {
     let allUsers: IntercomUser[] = [];
-    let nextPage = `${this.baseUrl}/contacts?type=user`;
+    let nextPageUrl = `${this.baseUrl}/contacts?type=user`;
 
-    while (nextPage) {
+    while (nextPageUrl) {
       try {
-        const response = await fetch(nextPage, {
+        console.log(`Fetching users page: ${nextPageUrl}`);
+        const response = await fetch(nextPageUrl, {
           headers: {
             'Authorization': `Bearer ${this.token}`,
             'Accept': 'application/json'
@@ -94,11 +95,24 @@ export class IntercomApi {
         
         allUsers = [...allUsers, ...users];
         
-        // Check if there's a next page
-        nextPage = data.pages?.next ? data.pages.next : null;
+        // Check if there's a next page - handle pagination properly
+        nextPageUrl = '';
+        
+        if (data.pages && typeof data.pages.next === 'string') {
+          // If it's already a full URL, use it directly
+          if (data.pages.next.startsWith('http')) {
+            nextPageUrl = data.pages.next;
+          } 
+          // If it's a relative path, append to base URL
+          else if (data.pages.next.startsWith('/')) {
+            nextPageUrl = `${this.baseUrl}${data.pages.next}`;
+          }
+          
+          console.log(`Next page URL: ${nextPageUrl || 'None'}`);
+        }
         
         // Add delay to avoid rate limiting
-        if (nextPage) {
+        if (nextPageUrl) {
           await new Promise(resolve => setTimeout(resolve, this.rateLimitDelay));
         }
       } catch (error) {

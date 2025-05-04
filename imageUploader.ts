@@ -43,7 +43,7 @@ export async function uploadImageToS3(): Promise<string> {
       Key: filename,
       Body: fileContent,
       ContentType: 'image/png',
-      ACL: 'public-read', // Make the file publicly accessible
+      ACL: 'public-read' as const, // Type assertion to match expected enum
     };
 
     // Upload the file
