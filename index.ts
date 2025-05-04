@@ -4,6 +4,8 @@ import { Request, Response } from 'express';
 import * as dotenv from 'dotenv';
 import { runDailyProcess } from './dailyRunner';
 import { IntercomApi } from './intercom-api';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Load environment variables
 dotenv.config();
@@ -12,23 +14,58 @@ dotenv.config();
 const isTestMode = process.argv.includes('--test');
 console.log(`Starting in ${isTestMode ? 'TEST' : 'PRODUCTION'} mode`);
 
-// Express server to keep the repl alive
+// Create logs directory if it doesn't exist
+const logsDir = path.join(__dirname, 'logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir);
+}
+
+// Logging function
+function log(message: string, isError = false) {
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] ${message}`;
+  
+  // Log to console
+  if (isError) {
+    console.error(logMessage);
+  } else {
+    console.log(logMessage);
+  }
+  
+  // Log to file
+  const today = new Date().toISOString().split('T')[0];
+  const logFile = path.join(logsDir, `${today}${isError ? '-error' : ''}.log`);
+  fs.appendFileSync(logFile, logMessage + '\n');
+}
+
+// Express server setup
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Basic route for health check
+// Basic route for health check and status
 app.get('/', (req: Request, res: Response) => {
   res.send(`
     <h1>Daily Runners Service</h1>
     <p>Status: Running in ${isTestMode ? 'TEST MODE (1 minute interval)' : 'PRODUCTION MODE (24 hour interval)'}</p>
     <p>Last run: ${lastRunTime ? new Date(lastRunTime).toLocaleString() : 'Never'}</p>
     <p>Next run: ${getNextRunTime()}</p>
+    <p>Server time: ${new Date().toLocaleString()}</p>
   `);
+});
+
+// Add a route to trigger the process manually (with optional security)
+app.get('/run', (req: Request, res: Response) => {
+  // You could add a secret key check here for security
+  // if (req.query.key !== process.env.API_SECRET) return res.status(403).send('Unauthorized');
+  
+  log('Manual trigger received');
+  runScheduledProcess();
+  res.send('Process triggered');
 });
 
 // Start the server
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  log(`Server is running on port ${PORT}`);
 });
 
 // Keep track of last run time
@@ -52,12 +89,12 @@ function getNextRunTime(): string {
 
 // Function to run the daily process
 async function runScheduledProcess() {
-  console.log(`Running scheduled process at ${new Date().toLocaleString()}`);
+  log(`Running scheduled process at ${new Date().toLocaleString()}`);
   
   try {
     // If test mode, only send to test users
     if (isTestMode) {
-      console.log('TEST MODE: Running with test users only');
+      log('TEST MODE: Running with test users only');
       await runTestProcess();
     } else {
       // Run the normal daily process
@@ -66,9 +103,9 @@ async function runScheduledProcess() {
     
     // Update last run time
     lastRunTime = Date.now();
-    console.log(`Process completed successfully at ${new Date().toLocaleString()}`);
+    log(`Process completed successfully at ${new Date().toLocaleString()}`);
   } catch (error) {
-    console.error('Error during scheduled process:', error);
+    log(`Error during scheduled process: ${error}`, true);
   }
 }
 
@@ -77,7 +114,7 @@ async function runTestProcess() {
   // Check if test user IDs are defined
   const testUserIdsString = process.env.TEST_USER_IDS;
   if (!testUserIdsString) {
-    console.error('TEST_USER_IDS environment variable is not set!');
+    log('TEST_USER_IDS environment variable is not set!', true);
     return;
   }
   
@@ -85,22 +122,22 @@ async function runTestProcess() {
   const testUserIds = testUserIdsString.split(',').map(id => id.trim()).filter(id => id.length > 0);
   
   if (testUserIds.length === 0) {
-    console.error('No valid test user IDs found!');
+    log('No valid test user IDs found!', true);
     return;
   }
   
-  console.log(`Found ${testUserIds.length} test users: ${testUserIds.join(', ')}`);
+  log(`Found ${testUserIds.length} test users: ${testUserIds.join(', ')}`);
   
   // Import necessary functions directly from dailyRunner
   const { generateImage, getMessageContent } = await import('./dailyRunner');
   
   try {
     // Generate the image (same as in production)
-    console.log('Generating test image...');
+    log('Generating test image...');
     const trendingTokens = await generateImage();
     
     // Upload the image to ImgBB (using the function from dailyRunner)
-    console.log('Uploading test image...');
+    log('Uploading test image...');
     const { uploadImageToImgBB } = await import('./imgbb-uploader');
     const imageUrl = await uploadImageToImgBB('./output.png');
     
@@ -123,17 +160,17 @@ async function runTestProcess() {
     let successCount = 0;
     for (const userId of testUserIds) {
       try {
-        console.log(`Sending test message to user ID: ${userId}`);
+        log(`Sending test message to user ID: ${userId}`);
         await intercom.sendInAppMessage(userId, testMessage);
         successCount++;
       } catch (error) {
-        console.error(`Error sending message to test user ${userId}:`, error);
+        log(`Error sending message to test user ${userId}: ${error}`, true);
       }
     }
     
-    console.log(`Test messages sent successfully to ${successCount} out of ${testUserIds.length} users`);
+    log(`Test messages sent successfully to ${successCount} out of ${testUserIds.length} users`);
   } catch (error) {
-    console.error('Error in test process:', error);
+    log(`Error in test process: ${error}`, true);
     throw error;
   }
 }
@@ -142,15 +179,35 @@ async function runTestProcess() {
 if (isTestMode) {
   // Test mode: run every minute
   cron.schedule('* * * * *', runScheduledProcess);
-  console.log('Scheduled to run every minute for testing');
+  log('Scheduled to run every minute for testing');
 } else {
   // Production mode: run at midnight UTC (00:00)
   cron.schedule('0 0 * * *', runScheduledProcess);
-  console.log('Scheduled to run daily at midnight UTC');
+  log('Scheduled to run daily at midnight UTC');
 }
 
 // Run immediately on startup if in test mode
 if (isTestMode) {
-  console.log('Test mode: Running immediately...');
+  log('Test mode: Running immediately...');
   runScheduledProcess();
-} 
+}
+
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+  log('SIGTERM received, shutting down gracefully');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  log('SIGINT received, shutting down gracefully');
+  process.exit(0);
+});
+
+// Catch unhandled exceptions and rejections
+process.on('uncaughtException', (error) => {
+  log(`Uncaught Exception: ${error}`, true);
+});
+
+process.on('unhandledRejection', (reason) => {
+  log(`Unhandled Rejection: ${reason}`, true);
+}); 
