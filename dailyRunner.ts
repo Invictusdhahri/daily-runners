@@ -137,26 +137,13 @@ function getMessageContent(imageUrl: string, trendingTokens: SimplifiedPoolInfo[
   if (trendingTokens && trendingTokens.length > 0) {
     tokenListHtml = '<ul style="list-style-type: none; padding-left: 0; margin-top: 15px; border: 1px solid #eee; border-radius: 8px; overflow: hidden;">';
     trendingTokens.slice(0, 5).forEach((token, index) => {
-      const price = parseFloat(token.coin_price);
-      const formattedPrice = price < 0.01 
-        ? price.toExponential(2) 
-        : price.toFixed(price < 1 ? 4 : 2);
-      
-      const change = parseFloat(token.price_change_24h);
-      const changeColor = change > 0 ? '#2ecc40' : '#ff4136';
-      const changeSign = change > 0 ? '+' : '';
-      
       tokenListHtml += `
-        <li style="padding: 12px; ${index !== 0 ? 'border-top: 1px solid #eee;' : ''} display: flex; justify-content: space-between; background-color: ${index % 2 === 0 ? '#f8f9fa' : '#fff'};">
+        <li style="padding: 12px; ${index !== 0 ? 'border-top: 1px solid #eee;' : ''} background-color: ${index % 2 === 0 ? '#f8f9fa' : '#fff'};">
           <div>
             <strong style="font-size: 15px;">${index + 1}. ${token.coin_name}</strong>
             <div style="font-size: 13px; color: #666; margin-top: 4px; word-break: break-all;">
               <span>Address: ${token.token_address}</span>
             </div>
-          </div>
-          <div style="text-align: right; min-width: 80px;">
-            <div style="font-weight: bold;">$${formattedPrice}</div>
-            <div style="color: ${changeColor}; font-size: 13px;">${changeSign}${change.toFixed(2)}%</div>
           </div>
         </li>
       `;
