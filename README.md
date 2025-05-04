@@ -2,24 +2,41 @@
 
 This project automatically generates images of trending tokens and sends them to users via Intercom on a scheduled basis (daily in production, every minute in test mode).
 
-## Setup Instructions
+## Features
 
-### 1. Clone the Repository
+- **Image Generation**: Creates visualizations of trending tokens
+- **Multiple Test Users**: Support for testing with multiple users in test mode
+- **Scheduled Execution**: Uses node-cron for scheduling
+- **Web Dashboard**: Simple web interface showing the service status
+
+## Deployment Options
+
+### VPS Deployment (Recommended)
+
+For detailed instructions on deploying this service on a VPS, see [README-VPS.md](README-VPS.md).
+
+The VPS deployment method:
+- Provides more reliability and control
+- Can be customized to your server environment
+- Runs as a systemd service for automatic restart
+- Includes monitoring and logging capabilities
+
+### Local Development
+
+#### 1. Install Dependencies
 
 ```bash
-git clone https://github.com/your-username/daily-runners.git
-cd daily-runners
-```
+# Install required system packages (Ubuntu/Debian)
+sudo apt-get update
+sudo apt-get install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev
 
-### 2. Install Dependencies
-
-```bash
+# Install Node.js packages
 npm install
 ```
 
-### 3. Environment Variables
+#### 2. Environment Variables
 
-Create a `.env` file in the project root with the following content:
+Create a `.env` file in the project root:
 
 ```
 # Intercom API Credentials
@@ -34,37 +51,19 @@ IMGBB_API_KEY=your_imgbb_api_key_here
 TEST_USER_IDS=user_id_1,user_id_2,user_id_3
 ```
 
-To get an ImgBB API key:
-1. Sign up at https://imgbb.com/
-2. Go to your dashboard
-3. Access your API key from the account settings
+#### 3. Running the Service
 
-### 4. Running the Service
-
-#### Production Mode
-Runs the service once every 24 hours at midnight UTC:
+**Production Mode** (runs once every 24 hours at midnight UTC):
 
 ```bash
 npm run start
 ```
 
-#### Test Mode
-Runs in test mode which executes every 1 minute and only sends messages to the test users specified in TEST_USER_IDS:
+**Test Mode** (runs every minute, only sends to test users):
 
 ```bash
 npm run test-mode
 ```
-
-## Features
-
-- **Image Generation**: Creates visualizations of trending tokens
-- **Multiple Test Users**: Support for testing with multiple users in test mode
-- **Scheduled Execution**: Uses node-cron for scheduling
-- **Web Dashboard**: Simple web interface showing the service status
-
-## Running on Replit
-
-For detailed instructions on running this service on Replit, see [README-REPLIT.md](README-REPLIT.md).
 
 ## Project Structure
 
@@ -73,6 +72,16 @@ For detailed instructions on running this service on Replit, see [README-REPLIT.
 - `generateImage.ts`: Handles the generation of trending token images
 - `intercom-api.ts`: Handles communication with the Intercom API
 - `imgbb-uploader.ts`: Uploads generated images to ImgBB for hosting
+
+## Available Commands
+
+- `npm run generate-image`: Generate the trending tokens image only
+- `npm run send-daily-message`: Send the daily message only
+- `npm run daily`: Run the full daily process once
+- `npm run test-imgbb`: Test the ImgBB image uploader
+- `npm run start`: Start the scheduled service (runs at midnight UTC daily)
+- `npm run test-mode`: Start in test mode (runs every minute)
+- `npm run build`: Build the TypeScript code
 
 ## Troubleshooting
 

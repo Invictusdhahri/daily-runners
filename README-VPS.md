@@ -4,20 +4,10 @@ This guide provides instructions for deploying the Daily Runners application on 
 
 ## Prerequisites
 
+- A Linux VPS (Ubuntu/Debian recommended)
 - Node.js 18 or higher
 - npm
-- A Linux VPS (Ubuntu/Debian recommended)
-- Basic knowledge of Linux and systemd
-
-## Required Dependencies
-
-The application requires some native dependencies for image processing. Install them with:
-
-```bash
-# For Ubuntu/Debian
-sudo apt-get update
-sudo apt-get install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev
-```
+- Sudo/root access for service installation
 
 ## Deployment Steps
 
@@ -28,121 +18,192 @@ git clone https://github.com/your-username/daily-runners.git
 cd daily-runners
 ```
 
-### 2. Set Up Environment Variables
+### 2. Run the Deployment Script
 
-Create a `.env` file based on the `.env.example`:
+The deployment script will:
+- Install required system dependencies
+- Install Node.js dependencies
+- Build the TypeScript code
+- Set up a systemd service to keep the application running
 
 ```bash
-cp .env.example .env
+# Make the script executable
+chmod +x deploy.sh
+
+# Run with sudo for system-level operations
+sudo ./deploy.sh
+```
+
+If you want to run in test mode (runs every minute) instead of production mode (runs daily):
+
+```bash
+sudo ./deploy.sh test
+```
+
+### 3. Configure Your Environment Variables
+
+If you didn't set up the environment variables during deployment:
+
+```bash
 nano .env
 ```
 
-Fill in all the required environment variables:
+Fill in the required values:
 - `INTERCOM_TOKEN`: Your Intercom API token
 - `INTERCOM_ADMIN_ID`: Your Intercom admin ID
 - `IMGBB_API_KEY`: Your ImgBB API key for image hosting
-- Other optional settings
 
-### 3. Run the Deployment Script
-
-```bash
-chmod +x deploy.sh
-./deploy.sh
-```
-
-The script will:
-- Install dependencies
-- Build the TypeScript code
-- Set up the logs directory
-- Prepare the systemd service file
-
-### 4. Install as a System Service
-
-Follow the instructions displayed by the deploy script:
+Then restart the service:
 
 ```bash
-sudo cp daily-runners.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable daily-runners.service
-sudo systemctl start daily-runners.service
+sudo systemctl restart daily-runners.service
 ```
 
-### 5. Check Service Status
+### 4. Verify Service Status
 
 ```bash
 sudo systemctl status daily-runners.service
 ```
 
-### 6. View Logs
+You should see output indicating the service is active (running).
 
-Logs are stored in both the system journal and in the logs directory:
+### 5. Access the Web Dashboard
+
+The application runs a web server that shows its status. Access it at:
+
+```
+http://your-vps-ip:3000
+```
+
+You can also manually trigger a run by visiting:
+
+```
+http://your-vps-ip:3000/run
+```
+
+## Security Considerations
+
+### Firewall Configuration
+
+By default, the application runs on port 3000. You should configure your firewall to allow access:
 
 ```bash
-# View system logs
+# Using UFW (Ubuntu)
+sudo ufw allow 3000/tcp
+
+# Using firewalld (CentOS/RHEL)
+sudo firewall-cmd --permanent --add-port=3000/tcp
+sudo firewall-cmd --reload
+```
+
+### Setting Up a Reverse Proxy (Recommended)
+
+For better security, consider setting up Nginx as a reverse proxy with SSL:
+
+1. Install Nginx:
+   ```bash
+   sudo apt install nginx
+   ```
+
+2. Set up an Nginx configuration:
+   ```bash
+   sudo nano /etc/nginx/sites-available/daily-runners
+   ```
+
+3. Add this configuration:
+   ```
+   server {
+       listen 80;
+       server_name your-domain.com;
+       
+       location / {
+           proxy_pass http://localhost:3000;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+       }
+   }
+   ```
+
+4. Enable the site and restart Nginx:
+   ```bash
+   sudo ln -s /etc/nginx/sites-available/daily-runners /etc/nginx/sites-enabled/
+   sudo nginx -t
+   sudo systemctl restart nginx
+   ```
+
+5. Add HTTPS with Certbot:
+   ```bash
+   sudo apt install certbot python3-certbot-nginx
+   sudo certbot --nginx -d your-domain.com
+   ```
+
+## Monitoring and Logs
+
+### Viewing Logs
+
+```bash
+# View service logs
 sudo journalctl -u daily-runners.service
 
-# View application logs
+# View recent logs with follow
+sudo journalctl -u daily-runners.service -f
+
+# Application-specific logs
 ls -la logs/
-cat logs/2023-05-24.log  # Replace with current date
+cat logs/$(date +%Y-%m-%d).log
 ```
 
-## Testing the Application
+### Monitoring the Service
 
-You can run the application in test mode to verify it works correctly:
+You can set up monitoring using a tool like Monit:
 
 ```bash
-./deploy.sh test
+sudo apt install monit
+sudo nano /etc/monit/conf.d/daily-runners
 ```
 
-This will run the application with the test flag, sending notifications only to test users.
-
-## Monitoring the Web Interface
-
-The application runs a web server that displays its status. You can access it at:
-
+Add:
 ```
-http://your-server-ip:3000
-```
-
-You can also manually trigger the daily process by visiting:
-
-```
-http://your-server-ip:3000/run
+check process daily-runners
+  with pidfile "/var/run/daily-runners.pid"
+  start program = "/bin/systemctl start daily-runners.service"
+  stop program = "/bin/systemctl stop daily-runners.service"
+  if failed port 3000 protocol http for 3 cycles then restart
+  if 3 restarts within 5 cycles then alert
 ```
 
-For security, consider setting up Nginx or another reverse proxy with SSL in front of the application.
-
-## Customizing the Schedule
-
-By default, the application runs daily at midnight UTC. To change this:
-
-1. Edit the `index.ts` file
-2. Modify the cron schedule expression in the production mode section
-3. Rebuild the application with `npm run build`
-4. Restart the service with `sudo systemctl restart daily-runners.service`
+Restart Monit:
+```bash
+sudo systemctl restart monit
+```
 
 ## Troubleshooting
 
-### Canvas Installation Issues
+### Service Won't Start
 
-If you encounter problems with the canvas library, try:
-
+Check for errors in the logs:
 ```bash
+sudo journalctl -u daily-runners.service -n 50 --no-pager
+```
+
+### Image Generation Issues
+
+If there are problems with image generation:
+```bash
+# Verify dependencies are installed
+sudo apt install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev
+
+# Rebuild canvas
 npm rebuild canvas --update-binary
 ```
 
-### Permissions Issues
+### Scheduled Jobs Not Running
 
-Make sure your application has write access to its directory:
-
+Check if cron is working:
 ```bash
-sudo chown -R youruser:youruser /path/to/daily-runners
-```
+# Test the application manually
+node dist/index.js --test
 
-### Service Not Starting
-
-Check the logs for detailed error messages:
-
-```bash
-sudo journalctl -u daily-runners.service -n 50
+# Check the system time
+date
 ``` 
