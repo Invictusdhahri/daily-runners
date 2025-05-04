@@ -15,9 +15,9 @@ const isTestMode = process.argv.includes('--test');
 console.log(`Starting in ${isTestMode ? 'TEST' : 'PRODUCTION'} mode`);
 
 // Create logs directory if it doesn't exist
-const logsDir = path.join(process.env.DATA_DIR || __dirname, 'logs');
+const logsDir = path.join(__dirname, 'logs');
 if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true });
+  fs.mkdirSync(logsDir);
 }
 
 // Logging function
