@@ -1,5 +1,5 @@
 import * as cron from 'node-cron';
-import * as express from 'express';
+import express from 'express';
 import { Request, Response } from 'express';
 import * as dotenv from 'dotenv';
 import { runDailyProcess } from './dailyRunner';
