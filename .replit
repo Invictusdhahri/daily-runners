@@ -1,6 +1,5 @@
-run = "bash -c 'apt-get update && apt-get install -y libuuid1 libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev && npm start'"
-entrypoint = "generateImage.ts"
-modules = ["nodejs-18:v3-20230608-f4cd419"]
+run = "npm run start"
+entrypoint = "index.ts"
 hidden = [".build", ".config"]
 
 [packager]
@@ -14,7 +13,7 @@ packageSearch = true
 XDG_CONFIG_HOME = "/home/runner/.config"
 
 [nix]
-channel = "stable-23_05"
+channel = "stable-22_11"
 
 [gitHubImport]
 requiredFiles = [".replit", "replit.nix", ".config"]
@@ -28,5 +27,5 @@ pattern = "**/{*.ts,*.js,*.tsx,*.jsx}"
 start = "typescript-language-server --stdio"
 
 [deployment]
-run = ["node", "index.js"]
-deploymentTarget = "cloudrun" 
+build = ["sh", "-c", "npm run build"]
+run = ["sh", "-c", "npm run start"] 

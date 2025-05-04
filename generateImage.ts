@@ -1,4 +1,4 @@
-import Jimp from 'jimp';
+import { createCanvas, loadImage } from 'canvas';
 import * as fs from 'fs';
 import * as path from 'path';
 import { getTrendingPools, SimplifiedPoolInfo } from './trending-tokens';
@@ -17,20 +17,19 @@ const IMAGE_X = BOX_LEFT + 32;
 const NAME_X = IMAGE_X + IMAGE_SIZE + 24;
 const CHANGE_X = BOX_LEFT + BOX_WIDTH - 60; // right-aligned for change
 const PRICE_X = BOX_LEFT + BOX_WIDTH - 60; // right-aligned for price
-const TEXT_COLOR = 0xFFFFFFFF; // white
-const SUBTEXT_COLOR = 0xAAAAAAAA; // light gray
-const GREEN = 0x2ECC40FF; // green
+const TEXT_COLOR = '#fff';
+const SUBTEXT_COLOR = '#aaa';
+const GREEN = '#2ecc40';
 
 async function drawTrendingTokensImage() {
   try {
-    // Load template background
-    const templatePath = path.join(__dirname, 'template.png');
-    const image = await Jimp.read(templatePath);
+    const canvas = createCanvas(WIDTH, HEIGHT);
+    const ctx = canvas.getContext('2d');
 
-    // Load a font for text
-    const fontLarge = await Jimp.loadFont(Jimp.FONT_SANS_32_WHITE);
-    const fontMedium = await Jimp.loadFont(Jimp.FONT_SANS_16_WHITE);
-    const fontSmall = await Jimp.loadFont(Jimp.FONT_SANS_16_WHITE);
+    // Draw template background
+    const templatePath = path.join(__dirname, 'template.png');
+    const templateImg = await loadImage(templatePath);
+    ctx.drawImage(templateImg, 0, 0, WIDTH, HEIGHT);
 
     // Fetch a larger pool of tokens to ensure we can fill 5 valid ones
     const RAW_POOL_SIZE = 20;
@@ -52,7 +51,7 @@ async function drawTrendingTokensImage() {
     const validTokens: typeof tokens = [];
     for (let i = 0; i < tokens.length && validTokens.length < NUM_TOKENS; i++) {
       try {
-        await Jimp.read(tokens[i].image_url);
+        await loadImage(tokens[i].image_url);
         validTokens.push(tokens[i]);
       } catch {
         continue;
@@ -68,54 +67,59 @@ async function drawTrendingTokensImage() {
       const y = startY + i * ITEM_HEIGHT;
       const token = validTokens[i];
 
-      try {
-        // Draw token image (guaranteed to load)
-        const tokenImage = await Jimp.read(token.image_url);
-        tokenImage.resize(IMAGE_SIZE, IMAGE_SIZE);
-        
-        // Create a circular mask for the token
-        const mask = new Jimp(IMAGE_SIZE, IMAGE_SIZE, 0x00000000);
-        mask.circle(); // Create a circular mask
-        
-        // Apply the mask to the token image
-        tokenImage.mask(mask, 0, 0);
-        
-        // Composite the token image on the main image
-        image.composite(tokenImage, IMAGE_X, y);
+      // Draw token image (guaranteed to load)
+      const img = await loadImage(token.image_url);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(IMAGE_X + IMAGE_SIZE / 2, y + IMAGE_SIZE / 2, IMAGE_SIZE / 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      ctx.drawImage(img, IMAGE_X, y, IMAGE_SIZE, IMAGE_SIZE);
+      ctx.restore();
 
-        // Draw token name (Jimp has limited text capabilities)
-        image.print(fontLarge, NAME_X, y, token.coin_name || 'Unknown');
+      // Draw token name
+      ctx.font = '700 26px Inter, Arial, sans-serif';
+      ctx.fillStyle = TEXT_COLOR;
+      ctx.textAlign = 'left';
+      ctx.fillText(token.coin_name || 'Unknown', NAME_X, y + 28);
 
-        // Draw volume
-        const volumeText = `$${(Number(token.volume_24h) / 1e6).toFixed(1)}M volume`;
-        image.print(fontSmall, NAME_X, y + 34, volumeText);
+      // Draw volume
+      ctx.font = '500 16px Inter, Arial, sans-serif';
+      ctx.fillStyle = SUBTEXT_COLOR;
+      ctx.fillText(`$${(Number(token.volume_24h) / 1e6).toFixed(1)}M volume`, NAME_X, y + 52);
 
-        // Draw price change
-        const change = Number(token.price_change_24h);
-        if (change > 0) {
-          const changeStr = `+${change.toFixed(2)}%`;
-          // Jimp doesn't have right-aligned text, so we'll position it manually
-          const textWidth = Jimp.measureText(fontMedium, changeStr);
-          image.print(fontMedium, CHANGE_X - textWidth, y, changeStr);
-        }
-
-        // Draw market cap
-        const marketCap = Number(token.market_cap);
-        const marketCapStr = marketCap >= 1e6 
-          ? `$${(marketCap / 1e6).toFixed(1)}M` 
-          : marketCap >= 1e3 
-            ? `$${(marketCap / 1e3).toFixed(0)}K` 
-            : `$${marketCap.toFixed(0)}`;
-        const mcapWidth = Jimp.measureText(fontMedium, marketCapStr);
-        image.print(fontMedium, PRICE_X - mcapWidth, y + 34, marketCapStr);
-      } catch (error) {
-        console.error(`Error processing token ${token.coin_name}:`, error);
+      // Draw price change
+      const change = Number(token.price_change_24h);
+      if (change > 0) {
+        ctx.font = '700 24px Inter, Arial, sans-serif';
+        ctx.fillStyle = GREEN;
+        ctx.textAlign = 'right';
+        const changeStr = `+${change.toFixed(2)}%`;
+        ctx.fillText(changeStr, CHANGE_X, y + 20);
       }
+
+      // Draw market cap
+      ctx.font = '500 18px Inter, Arial, sans-serif';
+      ctx.fillStyle = TEXT_COLOR;
+      const marketCap = Number(token.market_cap);
+      const marketCapStr = marketCap >= 1e6 
+        ? `$${(marketCap / 1e6).toFixed(1)}M` 
+        : marketCap >= 1e3 
+          ? `$${(marketCap / 1e3).toFixed(0)}K` 
+          : `$${marketCap.toFixed(0)}`;
+      ctx.fillText(marketCapStr, PRICE_X, y + 48);
     }
 
     // Save image
     const outputPath = path.join(__dirname, 'output.png');
-    await image.writeAsync(outputPath);
+    const stream = canvas.createPNGStream();
+    const out = fs.createWriteStream(outputPath);
+    
+    await new Promise<void>((resolve, reject) => {
+      stream.pipe(out);
+      out.on('finish', () => resolve());
+      out.on('error', reject);
+    });
     
     console.log('Image saved successfully as output.png');
     
