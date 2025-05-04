@@ -113,8 +113,8 @@ function getMessageContent(imageUrl: string, trendingTokens: SimplifiedPoolInfo[
         <li style="padding: 12px; ${index !== 0 ? 'border-top: 1px solid #eee;' : ''} background-color: ${index % 2 === 0 ? '#f8f9fa' : '#fff'};">
           <div>
             <strong style="font-size: 15px;">${index + 1}. ${token.coin_name}</strong>
-            <div style="font-size: 13px; color: #666; margin-top: 4px; word-break: break-all;">
-              <span>Address: ${token.token_address}</span>
+            <div style="font-size: 13px; margin-top: 6px; word-break: break-all;">
+              <code style="font-family: monospace; background-color: #f0f0f0; padding: 3px 5px; border-radius: 3px; color: #333; font-size: 12px;">${token.token_address}</code>
             </div>
           </div>
         </li>
