@@ -2,6 +2,15 @@
 
 This project automatically generates images of trending tokens and sends them to users via Intercom on a scheduled basis (daily in production, every minute in test mode).
 
+## Intercom User Messaging Tools
+
+This repository now includes tools for managing Intercom user interactions, specifically for:
+
+1. Diagnosing Intercom API connectivity
+2. Testing user retrieval
+3. Finding active users
+4. Sending messages to active users
+
 ## Setup Instructions
 
 ### 1. Clone the Repository
@@ -32,6 +41,12 @@ IMGBB_API_KEY=your_imgbb_api_key_here
 # Testing Configuration
 # Comma-separated list of user IDs for testing
 TEST_USER_IDS=user_id_1,user_id_2,user_id_3
+
+# Intercom Messaging Configuration
+MESSAGE_CONTENT=Optional custom message to send
+ACTIVITY_DAYS=30
+DEBUG=false
+DRY_RUN=true
 ```
 
 To get an ImgBB API key:
@@ -55,12 +70,56 @@ Runs in test mode which executes every 1 minute and only sends messages to the t
 npm run test-mode
 ```
 
+## Intercom Tools Usage
+
+### Intercom API Diagnostics
+
+This script diagnoses your Intercom API connection and available endpoints.
+
+```bash
+npx ts-node diagnose-intercom.ts
+```
+
+### User Retrieval Test
+
+Tests your ability to retrieve users from Intercom.
+
+```bash
+npx ts-node test-intercom-users.ts
+```
+
+### Active Users Test
+
+Finds users who have been active within a specified time window.
+
+```bash
+npx ts-node test-active-users.ts [days] [--all-pages]
+```
+
+- `days`: Optional number of days to look back (defaults to 30)
+- `--all-pages`: Optional flag to retrieve all pages of users
+
+### Send Messages to Active Users
+
+Sends a message to all users who have been active within a specified time window.
+
+```bash
+npx ts-node send-messages-to-active-users.ts [days] [--debug] [--dry-run]
+```
+
+Options:
+- `days`: Optional number of days to look back (defaults to 30)
+- `--debug`: Enable detailed logging
+- `--dry-run`: Run without actually sending messages
+- `--all-pages`: Retrieve all pages of users instead of limiting to 5 pages
+
 ## Features
 
 - **Image Generation**: Creates visualizations of trending tokens
 - **Multiple Test Users**: Support for testing with multiple users in test mode
 - **Scheduled Execution**: Uses node-cron for scheduling
 - **Web Dashboard**: Simple web interface showing the service status
+- **Active User Messaging**: New tools for targeting active users with messages
 
 ## Running on Replit
 
