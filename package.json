@@ -20,7 +20,7 @@
     "@types/node-fetch": "^2.6.12",
     "@types/puppeteer": "^5.4.7",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.8.3"
   },
   "scripts": {
     "generate-image": "ts-node generateImage.ts",
@@ -29,6 +29,12 @@
     "test-imgbb": "ts-node test-imgbb-uploader.ts",
     "start": "ts-node index.ts",
     "build": "tsc",
-    "test-mode": "ts-node index.ts --test"
+    "test-mode": "ts-node index.ts --test",
+    "run-now": "ts-node index.ts --run-now",
+    "active-users": "ts-node index.ts --run-now --active-users",
+    "debug-active": "ts-node index.ts --run-now --active-users --debug",
+    "dry-run": "ts-node index.ts --run-now --active-users --dry-run --debug",
+    "debug-small": "ts-node index.ts --run-now --active-users --dry-run --debug --max-users=10",
+    "diagnose-intercom": "ts-node debug-intercom-users.ts"
   }
 }
