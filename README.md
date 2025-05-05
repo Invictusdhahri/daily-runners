@@ -112,6 +112,57 @@ Options:
 - `--debug`: Enable detailed logging
 - `--dry-run`: Run without actually sending messages
 - `--all-pages`: Retrieve all pages of users instead of limiting to 5 pages
+- `--max-users=N`: Limit to sending messages to only N users
+
+### Running the Main Service
+
+The main service can be run with different options:
+
+```bash
+# Run in normal mode (scheduled for midnight)
+npm start
+
+# Run in test mode (runs every minute)
+npm run test-mode
+
+# Run immediately without waiting for schedule
+npm run run-now
+# Or directly:
+node index.js --run-now
+
+# Run immediately and send only to active users
+npm run active-users
+# Or directly:
+node index.js --run-now --active-users
+
+# Run with active users in debug mode
+npm run debug-active
+# Or directly:
+node index.js --run-now --active-users --debug
+
+# Run a dry run with active users (no messages sent)
+npm run dry-run
+# Or directly:
+node index.js --run-now --active-users --dry-run --debug
+
+# Run with just a few users (for quick testing)
+npm run debug-small
+# Or directly:
+node index.js --run-now --active-users --dry-run --debug --max-users=10
+
+# Run the intercom API diagnostics
+npm run diagnose-intercom
+```
+
+### Debug Options
+
+The application supports several debug options:
+
+- `--debug`: Enable detailed debug logging
+- `--dry-run`: Simulate sending messages without actually sending them
+- `--max-users=N`: Limit to processing only N users (great for quick tests)
+- `--active-users`: Only target users who have been active recently
+- `--run-now`: Run immediately rather than waiting for schedule
 
 ## Features
 
