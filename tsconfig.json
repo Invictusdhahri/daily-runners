@@ -1,18 +1,17 @@
 {
   "compilerOptions": {
-    "target": "es2018",
+    "target": "es2016",
     "module": "commonjs",
-    "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "outDir": "./dist",
-    "rootDir": ".",
-    "baseUrl": ".",
-    "paths": {
-      "trending-tokens": ["../trending-tokens"]
-    }
+    "strict": true,
+    "skipLibCheck": true,
+    "outDir": "./dist"
   },
-  "include": ["*.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 } 
